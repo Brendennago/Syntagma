@@ -56,6 +56,8 @@ node server.js
 
 ```
 
+5. **Start Learning**
+* Open your browser and visit http://localhost:3000
 
 
 ## 🚀 Roadmap & Vision
