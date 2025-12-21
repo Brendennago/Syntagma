@@ -4,7 +4,7 @@ An open-source SRS using LLMs for contextual vocabulary acquisition.
 
 ## 📖 Abstract
 
-Current language acquisition methodologies largely fall into two categories, each with distinct flaws:
+Current rapid language vocabulary acquistion methodologies tend to fall in to 2 main categories , each with distinct flaws:
 
 1. **SRS-Based Flashcards:** These rely on internal translation and subjective self-ratings of correctness. They do not guarantee contextual understanding.
 2. **Intensive Reading:** While this teaches context, re-reading static passages becomes dry and inefficient, lacking algorithmic optimization.
