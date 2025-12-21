@@ -4,9 +4,9 @@ An open-source SRS using LLMs for contextual vocabulary acquisition.
 
 ## 📖 Abstract
 
-Current rapid language vocabulary acquistion methodologies tend to fall in to 2 main categories , each with distinct flaws:
+Current rapid language vocabulary acquistion methodologies tend to fall in to 2 main categories, each with distinct flaws:
 
-1. **SRS-Based Flashcards:** These rely on internal translation and subjective self-ratings of correctness. They do not guarantee contextual understanding.
+1. **SRS-Based Flashcards:** These rely on internal translation and subjective self-ratings of correctness. They do not guarantee contextual understanding. Additionally it is really slow to review each word individually one by one.
 2. **Intensive Reading:** While this teaches context, re-reading static passages becomes dry and inefficient, lacking algorithmic optimization.
 
 **Syntagma** solves these issues by combining the best of Spaced Repetition Systems (SRS) and reading. It uses Generative AI to create unique passages based specifically around words due in the SRS queue. This allows for the study of vocabulary in changing contexts, utilizing an objective measurement of retention: **"Did you look up the word or not?"**
