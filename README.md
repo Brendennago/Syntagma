@@ -1,2 +1,71 @@
 # Syntagma
+
 An open-source SRS using LLMs for contextual vocabulary acquisition.
+
+## 📖 Abstract
+
+Current language acquisition methodologies largely fall into two categories, each with distinct flaws:
+
+1. **SRS-Based Flashcards:** These rely on internal translation and subjective self-ratings of correctness. They do not guarantee contextual understanding.
+2. **Intensive Reading:** While this teaches context, re-reading static passages becomes dry and inefficient, lacking algorithmic optimization.
+
+**Syntagma** solves these issues by combining the best of Spaced Repetition Systems (SRS) and reading. It uses Generative AI to create unique passages based specifically around words due in the SRS queue. This allows for the study of vocabulary in changing contexts, utilizing an objective measurement of retention: **"Did you look up the word or not?"**
+
+**Note:** This project was originally built with the intention of being sold strictly as a proprietary commercial service. However, after realizing the significant educational benefit of this generative methodology, I decided to open-source the core engine to make the learning potential accessible to everyone.
+
+## 🏗️ How It Works
+
+1. **Queue Retrieval:** The system pulls "due" words from the local database using a modified SRS algorithm.
+2. **Processing:** A Node.js server feeds these constraints into **Google Gemini**.
+3. **Generation:** The AI constructs a narrative passage containing the target words.
+4. **Objective Feedback:** The system tracks user interaction. If a user clicks to translate a word, it is marked as a "Fail." If they read fluently without clicking, it is a "Pass."
+
+## 🛠️ Tech Stack
+
+* **Backend:** Node.js, Express
+* **Database:** SQLite (`better-sqlite3`)
+* **AI:** Google Gemini API
+* **Frontend:** React (CDN), Vanilla JS, CSS3
+
+## ⚙️ Installation
+
+1. **Clone the Repo**
+```bash
+git clone https://github.com/Brendennago/Syntagma.git
+cd Syntagma
+
+```
+
+
+2. **Install Dependencies**
+```bash
+npm install
+
+```
+
+
+3. **Setup Environment**
+* Use the provided `.env.example` file as a template.
+* Obtain a free API key from [Google AI Studio](https://aistudio.google.com/).
+* Create a new file named `.env` in your root directory and paste your key into the `GEMINI_API_KEY` variable.
+
+
+4. **Run Server**
+```bash
+node server.js
+
+```
+
+
+
+## 🚀 Roadmap & Vision
+
+While the core engine is now open-source, future plans involve developing a polished, user-friendly integrated application with hosted server access sold as a service.
+
+### Possible Expansions
+
+Potential future applications for this engine include preparation for:
+
+* LSAT
+* MCAT
+* SAT
