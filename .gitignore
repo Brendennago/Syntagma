@@ -1,0 +1,14 @@
+Hide the massive dependencies folder
+
+node_modules/
+
+Hide the private API keys
+
+.env
+
+Hide the local database files (Users should create their own)
+
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

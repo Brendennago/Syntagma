@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syntagma Retention Engine</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    
+    <style>
+        :root { --primary: #2563eb; --bg-body: #f3f4f6; --sidebar-w: 260px; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-body); color: #1f2937; height: 100vh; overflow: hidden; }
+        .app { display: flex; height: 100%; }
+        
+        .sidebar { width: var(--sidebar-w); background: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; padding: 1.5rem; height: 100vh; }
+        .nav-item { padding: 0.75rem 1rem; cursor: pointer; border-radius: 0.5rem; color: #4b5563; margin-bottom: 0.25rem; display: flex; gap: 0.75rem; align-items: center; font-weight: 500; transition: all 0.2s; }
+        .nav-item:hover, .nav-item.active { background: #eff6ff; color: var(--primary); }
+        
+        .controls-section { margin-top: auto; border-top: 1px solid #e5e7eb; padding-top: 1rem; }
+        .control-group { margin-bottom: 1rem; }
+        .control-label { display: block; font-size: 0.75rem; font-weight: 600; color: #9ca3af; margin-bottom: 0.25rem; text-transform: uppercase; }
+        .control-select { width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-size: 0.875rem; color: #374151; background: #f9fafb; }
+        
+        .content { flex: 1; padding: 2rem; overflow-y: auto; position: relative; }
+        .card { background: white; padding: 1.5rem; border-radius: 0.75rem; border: 1px solid #e5e7eb; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        
+        .progress-track { display: flex; height: 20px; width: 100%; border-radius: 10px; overflow: hidden; background: #e5e7eb; margin-top: 10px; }
+        .progress-seg { height: 100%; transition: width 0.5s ease; }
+        
+        .btn { padding: 0.5rem 1rem; background: var(--primary); color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 0.5rem; transition: background 0.2s; }
+        .btn:hover { background: #1d4ed8; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-outline { background: transparent; border: 1px solid #d1d5db; color: #374151; }
+        .btn-outline:hover { background: #f3f4f6; }
+        .btn-icon { padding: 0.4rem; border-radius: 0.25rem; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-danger:hover { background: #b91c1c; }
+        
+        .word-span { cursor: pointer; padding: 2px 1px; border-radius: 3px; transition: background 0.2s; }
+        .word-span:hover { background: #fef3c7; }
+        .word-due { border-bottom: 2px solid #d97706; background: #fffbeb; color: #b45309; }
+        .word-learning { color: #2563eb; }
+        .word-known { color: #059669; }
+        .word-failed { color: #dc2626; border-bottom: 2px solid #ef4444; } 
+        .word-target { color: #9333ea; border-bottom: 2px dotted #c084fc; font-weight: 500; }
+        
+        .popup { position: fixed; background: white; border: 1px solid #e5e7eb; padding: 1rem; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 50; max-width: 300px; animation: fadeIn 0.2s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .bulk-toolbar { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: #1f2937; color: white; padding: 1rem 2rem; border-radius: 3rem; display: flex; gap: 1rem; align-items: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 100; animation: slideUp 0.3s; }
+        @keyframes slideUp { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+        .toast-error { position: fixed; bottom: 20px; right: 20px; background: #991b1b; color: white; padding: 1rem 1.5rem; border-radius: 0.75rem; box-shadow: 0 10px 15px rgba(0,0,0,0.2); z-index: 200; display: flex; align-items: center; gap: 0.75rem; animation: slideIn 0.3s; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        .passage-container { 
+            max-height: 500px; 
+            overflow-y: auto; 
+            padding-right: 1rem;
+            font-size: 1.35rem; 
+            line-height: 1.8; 
+            font-family: Georgia, serif;
+        }
+        .passage-container::-webkit-scrollbar { width: 8px; }
+        .passage-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        .passage-container::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+        .passage-container::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        .checkbox-group { display: flex; gap: 1rem; margin: 1rem 0; flex-wrap: wrap; }
+        .checkbox-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.75rem; border-radius: 0.5rem; transition: all 0.2s; border: 2px solid #e5e7eb; flex: 1; min-width: 200px; }
+        .checkbox-label:hover { background: #f9fafb; }
+        .checkbox-active { background: #eff6ff !important; border-color: #2563eb !important; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback } = React;
+        const API_URL = '/api';
+
+        const getTier = (interval) => {
+            const val = parseFloat(interval) || 0;
+            if (val <= 1) return 1;
+            if (val <= 10) return 2;
+            if (val <= 25) return 3;
+            return 4;
+        };
+
+        const Dashboard = ({ vocab }) => {
+            const stats = useMemo(() => {
+                const safe = Array.isArray(vocab) ? vocab : [];
+                const total = safe.length || 1;
+                return {
+                    total: safe.length,
+                    due: safe.filter(w => w.isDue).length,
+                    learned: safe.filter(w => w.step >= 6).length,
+                    targetWords: safe.filter(w => w.isTarget).length,
+                    t1: (safe.filter(w => getTier(w.interval) === 1).length / total) * 100,
+                    t2: (safe.filter(w => getTier(w.interval) === 2).length / total) * 100,
+                    t3: (safe.filter(w => getTier(w.interval) === 3).length / total) * 100,
+                    t4: (safe.filter(w => getTier(w.interval) === 4).length / total) * 100,
+                };
+            }, [vocab]);
+
+            return (
+                <div>
+                    <h1>Dashboard</h1>
+                    <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:'1rem', marginBottom:'2rem'}}>
+                        <div className="card" style={{textAlign:'center', borderLeft:'4px solid #d97706'}}>
+                            <div style={{fontSize:'2.5rem', color:'#d97706', fontWeight:'bold'}}>{stats.due}</div>
+                            <div style={{color:'#666'}}>Words Due</div>
+                        </div>
+                        <div className="card" style={{textAlign:'center', borderLeft:'4px solid #2563eb'}}>
+                            <div style={{fontSize:'2.5rem', color:'#2563eb', fontWeight:'bold'}}>{stats.total}</div>
+                            <div style={{color:'#666'}}>Total Words</div>
+                        </div>
+                        <div className="card" style={{textAlign:'center', borderLeft:'4px solid #8b5cf6'}}>
+                            <div style={{fontSize:'2.5rem', color:'#8b5cf6', fontWeight:'bold'}}>{stats.targetWords}</div>
+                            <div style={{color:'#666'}}>Target Queue</div>
+                        </div>
+                        <div className="card" style={{textAlign:'center', borderLeft:'4px solid #059669'}}>
+                            <div style={{fontSize:'2.5rem', color:'#059669', fontWeight:'bold'}}>{stats.learned}</div>
+                            <div style={{color:'#666'}}>Mastered</div>
+                        </div>
+                    </div>
+                    
+                    <div className="card">
+                        <h3>Retention Progress</h3>
+                        <div className="progress-track">
+                            <div className="progress-seg" style={{width:`${stats.t1}%`, background:'#60a5fa'}} title="Learning"></div>
+                            <div className="progress-seg" style={{width:`${stats.t2}%`, background:'#34d399'}} title="Graduated"></div>
+                            <div className="progress-seg" style={{width:`${stats.t3}%`, background:'#f472b6'}} title="Reviewing"></div>
+                            <div className="progress-seg" style={{width:`${stats.t4}%`, background:'#fbbf24'}} title="Mastered"></div>
+                        </div>
+                        <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem', marginTop:'0.5rem', color:'#666'}}>
+                            <span>Learning</span>
+                            <span>Graduated</span>
+                            <span>Reviewing</span>
+                            <span>Mastered</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const Reading = ({ vocab, refreshData, langCode, level, setTab, showError }) => {
+            const [text, setText] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [popup, setPopup] = useState(null);
+            const [lookedUpWords, setLookedUpWords] = useState([]); 
+            const [wordStates, setWordStates] = useState({});
+
+            useEffect(() => {
+                const loadSession = async () => {
+                    try {
+                        const res = await axios.get(`${API_URL}/load-session?langCode=${langCode}`);
+                        if (res.data.passage) {
+                            setText(res.data.passage);
+                            setLookedUpWords(res.data.lookedUpWords || []);
+                        }
+                    } catch (e) {
+                        console.log("No saved session");
+                    }
+                };
+                loadSession();
+            }, [langCode]);
+
+            useEffect(() => {
+                const interval = setInterval(() => { refreshData(); }, 30000);
+                return () => clearInterval(interval);
+            }, [refreshData]);
+
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (e.key === 'Backspace' && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'INPUT') {
+                        handleUndo();
+                    }
+                };
+                document.addEventListener('keydown', handleKeyDown);
+                return () => document.removeEventListener('keydown', handleKeyDown);
+            }, [lookedUpWords, wordStates]);
+
+            const handleUndo = async () => {
+                if (lookedUpWords.length > 0) {
+                    const newHistory = [...lookedUpWords];
+                    const removedWord = newHistory.pop(); 
+                    setLookedUpWords(newHistory);
+                    setPopup(null); 
+                    
+                    const previousState = wordStates[removedWord] || null;
+                    try {
+                        await axios.post(`${API_URL}/undo-lookup`, { word: removedWord, langCode, previousState });
+                        setWordStates(prev => {
+                            const newStates = { ...prev };
+                            delete newStates[removedWord];
+                            return newStates;
+                        });
+                        await refreshData();
+                    } catch (e) {
+                        showError("Undo failed.");
+                    }
+                }
+            };
+
+            const generate = async (shouldReset = true) => {
+                setLoading(true);
+                if (shouldReset) {
+                    setLookedUpWords([]);
+                    setWordStates({});
+                }
+                try {
+                    const res = await axios.post(`${API_URL}/generate-passage`, { langCode, level });
+                    setText(res.data.passage);
+                    await axios.post(`${API_URL}/save-session`, { passage: res.data.passage, lookedUpWords: [], langCode });
+                } catch (e) { 
+                    showError(e.response?.data?.error || "Generation failed."); 
+                }
+                setLoading(false);
+            };
+
+            const handleFinish = async (andGenerateNext = false) => {
+                if (!text) return;
+                setLoading(true);
+                const allWords = [...new Set((text.match(/[\p{L}]+/gu)||[]).map(w=>w.toLowerCase()))];
+                const wordsToPass = allWords.filter(w => !lookedUpWords.includes(w));
+                try {
+                    await axios.post(`${API_URL}/pass-words-batch`, { words: wordsToPass, langCode });
+                    await refreshData();
+                    if (andGenerateNext) {
+                        setLookedUpWords([]);
+                        setWordStates({});
+                        generate(true);
+                    } else {
+                        setText("");
+                        setLookedUpWords([]);
+                        setWordStates({});
+                        await axios.post(`${API_URL}/save-session`, { passage: '', lookedUpWords: [], langCode });
+                        setTab('dashboard');
+                    }
+                } catch (e) { showError("Error saving progress."); }
+                setLoading(false);
+            };
+
+            const handleSaveForLater = async () => {
+                try {
+                    await axios.post(`${API_URL}/save-session`, { passage: text, lookedUpWords, langCode });
+                    alert('✅ Session saved!');
+                    setTab('dashboard');
+                } catch (e) {
+                    showError("Failed to save.");
+                }
+            };
+
+            const wordClick = async (e, word) => {
+                if (!lookedUpWords.includes(word)) setLookedUpWords(prev => [...prev, word]);
+                const rect = e.target.getBoundingClientRect();
+                setPopup({ x: rect.left, y: rect.bottom + 5, word, def: 'Loading...' });
+                try {
+                    const res = await axios.post(`${API_URL}/lookup-word`, { word, langCode });
+                    if (res.data.previousState) setWordStates(prev => ({ ...prev, [word]: res.data.previousState }));
+                    setPopup(p => p && p.word === word ? { ...p, def: res.data.definition } : p);
+                    await refreshData();
+                    await axios.post(`${API_URL}/save-session`, { passage: text, lookedUpWords: [...lookedUpWords, word], langCode });
+                } catch (e) { setPopup(p => ({ ...p, def: 'Error' })); }
+            };
+
+            const safeVocab = Array.isArray(vocab) ? vocab : [];
+            const dueCount = safeVocab.filter(w => w.isDue).length;
+
+            return (
+                <div className="card" style={{minHeight: '60vh'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:'1.5rem', borderBottom:'1px solid #eee', paddingBottom:'1rem', flexWrap:'wrap', gap:'0.5rem'}}>
+                        <h2 style={{margin:0}}>Reading ({level}) {dueCount > 0 && <span style={{marginLeft:'0.5rem', fontSize:'0.8rem', color:'#d97706'}}>({dueCount} due)</span>}</h2>
+                        <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap'}}>
+                            <button className="btn btn-outline" onClick={handleUndo}><i className="ri-arrow-go-back-line"></i> Undo</button>
+                            <button className="btn btn-outline" onClick={handleSaveForLater}><i className="ri-save-3-line"></i> Save</button>
+                            <button className="btn" onClick={()=>generate(true)} disabled={loading}>{loading ? 'Generating...' : 'Generate'}</button>
+                            <button className="btn" onClick={()=>handleFinish(true)} disabled={loading}>Next <i className="ri-arrow-right-line"></i></button>
+                            <button className="btn" style={{background:'#059669'}} onClick={()=>handleFinish(false)} disabled={loading}>Finish</button>
+                        </div>
+                    </div>
+                    
+                    <div className="passage-container">
+                        {text ? text.split(/(\s+)/).map((part, i) => {
+                            const clean = part.trim().toLowerCase().replace(/[^\p{L}]/gu, '');
+                            if (!clean) return <span key={i}>{part}</span>;
+                            const info = safeVocab.find(v => v.word.toLowerCase() === clean);
+                            const isLookedUp = lookedUpWords.includes(clean);
+                            let cls = 'word-span';
+                            if (isLookedUp) cls += ' word-failed';
+                            else if (info?.isDue) cls += ' word-due';
+                            else if (info?.isTarget) cls += ' word-target';
+                            else if (info?.step >= 6) cls += ' word-known';
+                            else if (info) cls += ' word-learning';
+                            return <span key={i} className={cls} onClick={(e) => wordClick(e, clean)}>{part}</span>;
+                        }) : (
+                            <div style={{textAlign:'center', padding:'4rem 0', color:'#9ca3af'}}>
+                                <i className="ri-edit-box-line" style={{fontSize:'3rem', display:'block', marginBottom:'1rem'}}></i>
+                                <p>Click <strong>Generate</strong> to create a passage.</p>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {popup && (
+                        <div className="popup" style={{left:popup.x, top:popup.y}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'0.5rem'}}>
+                                <strong style={{color:'#dc2626'}}>{popup.word}</strong>
+                                <i className="ri-close-line" style={{cursor:'pointer'}} onClick={()=>setPopup(null)}></i>
+                            </div>
+                            <p style={{margin:0, color:'#374151'}}>{popup.def}</p>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const Vocabulary = ({ vocab, refreshData, langCode }) => {
+            const [filter, setFilter] = useState('all');
+            const [levelFilter, setLevelFilter] = useState('all');
+            const [selected, setSelected] = useState(new Set());
+            const filtered = (vocab || []).filter(w => {
+                if (filter === 'due' && !w.isDue) return false;
+                if (filter === 'learned' && w.step < 6) return false;
+                if (filter === 'target' && !w.isTarget) return false;
+                
+                if (levelFilter !== 'all') {
+                    const tier = getTier(w.interval || 0);
+                    if (levelFilter === 'learning' && tier !== 1) return false;
+                    if (levelFilter === 'graduated' && tier !== 2) return false;
+                    if (levelFilter === 'reviewing' && tier !== 3) return false;
+                    if (levelFilter === 'mastered' && tier !== 4) return false;
+                }
+                
+                return true;
+            });
+
+            const toggleSelect = (word) => {
+                const newSet = new Set(selected);
+                if (newSet.has(word)) newSet.delete(word); else newSet.add(word);
+                setSelected(newSet);
+            };
+
+            const toggleAll = () => {
+                if (selected.size === filtered.length) setSelected(new Set());
+                else setSelected(new Set(filtered.map(w => w.word)));
+            };
+
+            const handleBulkAction = async (action) => {
+                if (selected.size === 0) return;
+                if (!confirm(`${action} ${selected.size} words?`)) return;
+                try {
+                    await axios.post(`${API_URL}/bulk-action`, { words: Array.from(selected), action, langCode });
+                    setSelected(new Set());
+                    refreshData();
+                } catch (e) {
+                    alert("Failed.");
+                }
+            };
+
+            const formatInterval = (val) => {
+                const num = parseFloat(val);
+                if (!num || isNaN(num)) return 'New';
+                if (num >= 1) return num.toFixed(1) + 'd';
+                const mins = Math.round(num * 1440);
+                return mins + 'm';
+            };
+
+            return (
+                <div className="card" style={{display:'flex', flexDirection:'column', height:'calc(100vh - 4rem)'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: '1rem', gap: '1rem', flexWrap: 'wrap'}}>
+                        <h2>Vocabulary ({filtered.length})</h2>
+                        <div style={{display:'flex', gap:'0.5rem'}}>
+                            <select value={filter} onChange={(e)=>setFilter(e.target.value)} style={{padding:'0.5rem', borderRadius:'0.5rem'}}>
+                                <option value="all">All Status</option>
+                                <option value="due">Due</option>
+                                <option value="target">Target Queue</option>
+                                <option value="learned">Mastered</option>
+                            </select>
+                            <select value={levelFilter} onChange={(e)=>setLevelFilter(e.target.value)} style={{padding:'0.5rem', borderRadius:'0.5rem'}}>
+                                <option value="all">All Levels</option>
+                                <option value="learning">Learning (≤1d)</option>
+                                <option value="graduated">Graduated (≤10d)</option>
+                                <option value="reviewing">Reviewing (≤25d)</option>
+                                <option value="mastered">Mastered (>25d)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style={{flex:1, overflowY:'auto', border:'1px solid #eee', borderRadius:'0.5rem'}}>
+                        <table style={{width:'100%', borderCollapse:'collapse'}}>
+                            <thead><tr style={{textAlign:'left', borderBottom:'1px solid #e5e7eb', background:'#f9fafb', position:'sticky', top:0}}>
+                                <th style={{padding:'12px', width:'40px'}}><input type="checkbox" checked={filtered.length > 0 && selected.size === filtered.length} onChange={toggleAll} /></th>
+                                <th style={{padding:'12px'}}>Word</th>
+                                <th style={{padding:'12px'}}>Status</th>
+                                <th style={{padding:'12px'}}>Interval</th>
+                                <th style={{padding:'12px'}}>Actions</th>
+                            </tr></thead>
+                            <tbody>
+                                {filtered.map((w, i) => (
+                                    <tr key={i} style={{borderBottom:'1px solid #eee', background: selected.has(w.word) ? '#eff6ff' : 'transparent'}}>
+                                        <td style={{padding:'12px'}}><input type="checkbox" checked={selected.has(w.word)} onChange={()=>toggleSelect(w.word)} /></td>
+                                        <td style={{padding:'12px', fontWeight:'500'}}>
+                                            {w.word}
+                                            {w.isTarget && <span style={{marginLeft:'0.5rem', fontSize:'0.7rem', background:'#8b5cf6', color:'white', padding:'2px 6px', borderRadius:'3px'}}>TARGET</span>}
+                                        </td>
+                                        <td>{w.isDue ? <span style={{color:'#dc2626', fontWeight:'bold'}}>DUE</span> : (w.step >= 6 ? <span style={{color:'#059669'}}>Known</span> : <span style={{color:'#2563eb'}}>Learning</span>)}</td>
+                                        <td>{formatInterval(w.interval)}</td>
+                                        <td>
+                                            <button className="btn btn-outline btn-icon" onClick={async ()=>{await axios.post(`${API_URL}/reset-word`, {word: w.word, langCode, resetType: 'reset'}); refreshData();}}><i className="ri-refresh-line"></i></button>
+                                            <button className="btn btn-danger btn-icon" style={{marginLeft:'5px'}} onClick={async ()=>{if(confirm('Delete?')) { await axios.post(`${API_URL}/reset-word`, {word: w.word, langCode, resetType: 'delete'}); refreshData(); }}}><i className="ri-delete-bin-line"></i></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    {selected.size > 0 && (
+                        <div className="bulk-toolbar">
+                            <span>{selected.size} Selected</span>
+                            <button className="btn btn-outline" style={{color:'white', borderColor:'white'}} onClick={()=>handleBulkAction('reset')}>Reset</button>
+                            <button className="btn btn-danger" onClick={()=>handleBulkAction('delete')}>Delete</button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const Import = ({ langCode, refreshData, showError }) => {
+            const [raw, setRaw] = useState("");
+            const [importMode, setImportMode] = useState('target');
+            
+            const handleImport = async () => {
+                if(!raw.trim()) return;
+                const words = raw.split('\n').filter(w=>w.trim());
+                try {
+                    await axios.post(`${API_URL}/import-words`, { 
+                        words, 
+                        langCode,
+                        makeTargetList: importMode === 'target',
+                        makeDueNow: importMode === 'dueNow'
+                    }); 
+                    refreshData(); 
+                    setRaw("");
+                    alert(`✅ Imported ${words.length} words!`);
+                } catch (e) { showError("Import failed."); }
+            };
+            
+            return (
+                <div className="card">
+                    <h2>Import Vocabulary</h2>
+                    <p style={{color:'#666', marginBottom:'1rem'}}>
+                        Paste words (one per line) and choose import mode:
+                    </p>
+                    
+                    <div className="checkbox-group">
+                        <label 
+                            className={`checkbox-label ${importMode === 'target' ? 'checkbox-active' : ''}`}
+                            onClick={() => setImportMode('target')}
+                        >
+                            <input type="radio" checked={importMode === 'target'} readOnly style={{pointerEvents:'none'}} />
+                            <div>
+                                <strong>📚 Target Queue (Recommended)</strong>
+                                <div style={{fontSize:'0.85rem', color:'#666', marginTop:'0.25rem'}}>Words presented gradually in order. Not due immediately.</div>
+                            </div>
+                        </label>
+                        <label 
+                            className={`checkbox-label ${importMode === 'dueNow' ? 'checkbox-active' : ''}`}
+                            onClick={() => setImportMode('dueNow')}
+                        >
+                            <input type="radio" checked={importMode === 'dueNow'} readOnly style={{pointerEvents:'none'}} />
+                            <div>
+                                <strong>⚡ Due Immediately</strong>
+                                <div style={{fontSize:'0.85rem', color:'#666', marginTop:'0.25rem'}}>Review all words right away.</div>
+                            </div>
+                        </label>
+                    </div>
+                    
+                    <textarea 
+                        style={{width:'100%', height:'250px', padding:'1rem', borderRadius:'0.5rem', border:'1px solid #ddd', margin:'1rem 0', fontFamily:'monospace', fontSize:'0.95rem'}} 
+                        value={raw} 
+                        onChange={(e)=>setRaw(e.target.value)} 
+                        placeholder="casa&#10;perro&#10;gato&#10;comer&#10;beber"
+                    />
+                    <button className="btn" onClick={handleImport} disabled={!raw.trim()}>
+                        <i className="ri-upload-line"></i> Import {raw.split('\n').filter(w=>w.trim()).length} Words
+                    </button>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [tab, setTab] = useState('dashboard');
+            const [vocab, setVocab] = useState([]);
+            const [langCode, setLangCode] = useState('es');
+            const [level, setLevel] = useState('B1');
+            const [errorMsg, setErrorMsg] = useState(null);
+
+            const loadData = useCallback(async () => {
+                try {
+                    const res = await axios.get(`${API_URL}/vocabulary-list?langCode=${langCode}`);
+                    setVocab(Array.isArray(res.data) ? res.data : []);
+                } catch (e) { 
+                    console.error("Load Data Error:", e);
+                }
+            }, [langCode]);
+
+            useEffect(() => { loadData(); }, [loadData]);
+
+            useEffect(() => {
+                if (errorMsg) {
+                    const timer = setTimeout(() => setErrorMsg(null), 5000);
+                    return () => clearTimeout(timer);
+                }
+            }, [errorMsg]);
+
+            return (
+                <div className="app">
+                    <div className="sidebar">
+                        <div style={{display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'2rem'}}>
+                            <i className="ri-brain-line" style={{fontSize:'1.5rem', color:'var(--primary)'}}></i>
+                            <h2 style={{margin: 0, color:'var(--primary)'}}>Syntagma</h2>
+                        </div>
+                        <div className={`nav-item ${tab==='dashboard'?'active':''}`} onClick={()=>setTab('dashboard')}><i className="ri-dashboard-line"></i> Dashboard</div>
+                        <div className={`nav-item ${tab==='reading'?'active':''}`} onClick={()=>setTab('reading')}><i className="ri-book-read-line"></i> Reading</div>
+                        <div className={`nav-item ${tab==='vocabulary'?'active':''}`} onClick={()=>setTab('vocabulary')}><i className="ri-list-check"></i> Vocabulary</div>
+                        <div className={`nav-item ${tab==='import'?'active':''}`} onClick={()=>setTab('import')}><i className="ri-file-add-line"></i> Import</div>
+                        <div className="controls-section">
+                            <div className="control-group">
+                                <label className="control-label">Language</label>
+                                <select className="control-select" value={langCode} onChange={(e)=>setLangCode(e.target.value)}>
+                                    <option value="es">Spanish</option>
+                                    <option value="fr">French</option>
+                                    <option value="de">German</option>
+                                    <option value="it">Italian</option>
+                                    <option value="ja">Japanese</option>
+                                    <option value="zh">Chinese</option>
+                                    <option value="ar">Arabic</option>
+                                </select>
+                            </div>
+                            <div className="control-group">
+                                <label className="control-label">Level</label>
+                                <select className="control-select" value={level} onChange={(e)=>setLevel(e.target.value)}>
+                                    <option value="A1">A1</option>
+                                    <option value="A2">A2</option>
+                                    <option value="B1">B1</option>
+                                    <option value="B2">B2</option>
+                                    <option value="C1">C1</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="content">
+                        {tab === 'dashboard' && <Dashboard vocab={vocab} />}
+                        {tab === 'reading' && <Reading vocab={vocab} refreshData={loadData} langCode={langCode} level={level} setTab={setTab} showError={setErrorMsg} />}
+                        {tab === 'vocabulary' && <Vocabulary vocab={vocab} refreshData={loadData} langCode={langCode} />}
+                        {tab === 'import' && <Import langCode={langCode} refreshData={loadData} showError={setErrorMsg} />}
+                        
+                        {errorMsg && (
+                            <div className="toast-error">
+                                <i className="ri-error-warning-line"></i> {errorMsg}
+                                <button onClick={()=>setErrorMsg(null)} style={{background:'none', border:'none', color:'white', marginLeft:'10px', cursor:'pointer', fontSize:'1.5rem'}}>×</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
