@@ -83,6 +83,22 @@
         const { useState, useEffect, useMemo, useCallback } = React;
         const API_URL = '/api';
 
+        const segmentText = (text, langCode) => {
+            const latinLanguages = ['es', 'fr', 'de', 'it', 'pt', 'en'];
+            if (latinLanguages.includes(langCode)) {
+                return text.split(/(\s+)/);
+            }
+            return null;
+        };
+
+        const useTextSelection = (langCode) => {
+            return ['ja', 'zh', 'ar'].includes(langCode);
+        };
+
+        const extractAllWords = (text) => {
+            return [...new Set((text.match(/[\p{L}]+/gu) || []).map(w => w.toLowerCase()))];
+        };
+
         const getTier = (interval) => {
             const val = parseFloat(interval) || 0;
             if (val <= 1) return 1;
@@ -154,6 +170,8 @@
             const [popup, setPopup] = useState(null);
             const [lookedUpWords, setLookedUpWords] = useState([]); 
             const [wordStates, setWordStates] = useState({});
+            
+            const isSelectionMode = useTextSelection(langCode);
 
             useEffect(() => {
                 const loadSession = async () => {
@@ -226,7 +244,7 @@
             const handleFinish = async (andGenerateNext = false) => {
                 if (!text) return;
                 setLoading(true);
-                const allWords = [...new Set((text.match(/[\p{L}]+/gu)||[]).map(w=>w.toLowerCase()))];
+                const allWords = extractAllWords(text);
                 const wordsToPass = allWords.filter(w => !lookedUpWords.includes(w));
                 try {
                     await axios.post(`${API_URL}/pass-words-batch`, { words: wordsToPass, langCode });
@@ -259,23 +277,66 @@
             const wordClick = async (e, word) => {
                 if (!lookedUpWords.includes(word)) setLookedUpWords(prev => [...prev, word]);
                 const rect = e.target.getBoundingClientRect();
-                setPopup({ x: rect.left, y: rect.bottom + 5, word, def: 'Loading...' });
+                setPopup({ x: rect.left, y: rect.bottom + window.scrollY + 5, word, def: 'Loading...' });
                 try {
                     const res = await axios.post(`${API_URL}/lookup-word`, { word, langCode });
                     if (res.data.previousState) setWordStates(prev => ({ ...prev, [word]: res.data.previousState }));
                     setPopup(p => p && p.word === word ? { ...p, def: res.data.definition } : p);
                     await refreshData();
                     await axios.post(`${API_URL}/save-session`, { passage: text, lookedUpWords: [...lookedUpWords, word], langCode });
-                } catch (e) { setPopup(p => ({ ...p, def: 'Error' })); }
+                } catch (e) { setPopup(p => p && p.word === word ? { ...p, def: 'Error' } : p); }
+            };
+            
+            const handleTextSelection = async (e) => {
+                const selection = window.getSelection();
+                const selectedText = selection.toString().trim();
+                if (selectedText) {
+                    const cleanWord = selectedText.toLowerCase().replace(/[^\p{L}]/gu, '');
+                    if (cleanWord) {
+                        const range = selection.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+                        
+                        if (!lookedUpWords.includes(cleanWord)) {
+                            setLookedUpWords(prev => [...prev, cleanWord]);
+                        }
+                        
+                        setPopup({ x: rect.left, y: rect.bottom + window.scrollY + 5, word: cleanWord, def: 'Loading...' });
+                        
+                        try {
+                            const res = await axios.post(`${API_URL}/lookup-word`, { word: cleanWord, langCode });
+                            if (res.data.previousState) setWordStates(prev => ({ ...prev, [cleanWord]: res.data.previousState }));
+                            setPopup(p => p && p.word === cleanWord ? { ...p, def: res.data.definition } : p);
+                            await refreshData();
+                            await axios.post(`${API_URL}/save-session`, { passage: text, lookedUpWords: [...lookedUpWords, cleanWord], langCode });
+                        } catch (err) {
+                            setPopup(p => p && p.word === cleanWord ? { ...p, def: 'Error' } : p);
+                        }
+                        
+                        selection.removeAllRanges();
+                    }
+                }
             };
 
             const safeVocab = Array.isArray(vocab) ? vocab : [];
             const dueCount = safeVocab.filter(w => w.isDue).length;
+            
+            // Build vocab lookup map for performance
+            const vocabMap = useMemo(() => {
+                const map = new Map();
+                safeVocab.forEach(v => {
+                    map.set(v.word.toLowerCase(), v);
+                });
+                return map;
+            }, [safeVocab]);
 
             return (
                 <div className="card" style={{minHeight: '60vh'}}>
                     <div style={{display:'flex', justifyContent:'space-between', marginBottom:'1.5rem', borderBottom:'1px solid #eee', paddingBottom:'1rem', flexWrap:'wrap', gap:'0.5rem'}}>
-                        <h2 style={{margin:0}}>Reading ({level}) {dueCount > 0 && <span style={{marginLeft:'0.5rem', fontSize:'0.8rem', color:'#d97706'}}>({dueCount} due)</span>}</h2>
+                        <h2 style={{margin:0}}>
+                            Reading ({level}) 
+                            {dueCount > 0 && <span style={{marginLeft:'0.5rem', fontSize:'0.8rem', color:'#d97706'}}>({dueCount} due)</span>}
+                            {isSelectionMode && <span style={{marginLeft:'0.5rem', fontSize:'0.8rem', color:'#8b5cf6'}}>🖍️ Highlight to lookup</span>}
+                        </h2>
                         <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap'}}>
                             <button className="btn btn-outline" onClick={handleUndo}><i className="ri-arrow-go-back-line"></i> Undo</button>
                             <button className="btn btn-outline" onClick={handleSaveForLater}><i className="ri-save-3-line"></i> Save</button>
@@ -285,20 +346,50 @@
                         </div>
                     </div>
                     
-                    <div className="passage-container">
-                        {text ? text.split(/(\s+)/).map((part, i) => {
-                            const clean = part.trim().toLowerCase().replace(/[^\p{L}]/gu, '');
-                            if (!clean) return <span key={i}>{part}</span>;
-                            const info = safeVocab.find(v => v.word.toLowerCase() === clean);
-                            const isLookedUp = lookedUpWords.includes(clean);
-                            let cls = 'word-span';
-                            if (isLookedUp) cls += ' word-failed';
-                            else if (info?.isDue) cls += ' word-due';
-                            else if (info?.isTarget) cls += ' word-target';
-                            else if (info?.step >= 6) cls += ' word-known';
-                            else if (info) cls += ' word-learning';
-                            return <span key={i} className={cls} onClick={(e) => wordClick(e, clean)}>{part}</span>;
-                        }) : (
+                    <div 
+                        className="passage-container"
+                        style={{ userSelect: isSelectionMode ? 'text' : 'auto' }}
+                        onMouseUp={isSelectionMode ? handleTextSelection : undefined}
+                    >
+                        {text ? (
+                            isSelectionMode ? (
+                                <div style={{ cursor: 'text' }}>
+                                    {text.split('').map((char, i) => {
+                                        const clean = char.toLowerCase().replace(/[^\p{L}]/gu, '');
+                                        if (!clean) return <span key={i}>{char}</span>;
+                                        
+                                        const info = vocabMap.get(clean);
+                                        const isLookedUp = lookedUpWords.includes(clean);
+                                        
+                                        let cls = '';
+                                        if (isLookedUp) cls = 'word-failed';
+                                        else if (info?.isDue) cls = 'word-due';
+                                        else if (info?.isTarget) cls = 'word-target';
+                                        else if (info?.step >= 6) cls = 'word-known';
+                                        else if (info) cls = 'word-learning';
+                                        
+                                        return <span key={i} className={cls} style={{padding: 0}}>{char}</span>;
+                                    })}
+                                </div>
+                            ) : (
+                                segmentText(text, langCode).map((part, i) => {
+                                    const clean = part.trim().toLowerCase().replace(/[^\p{L}]/gu, '');
+                                    if (!clean) return <span key={i}>{part}</span>;
+                                    
+                                    const info = vocabMap.get(clean);
+                                    const isLookedUp = lookedUpWords.includes(clean);
+                                    
+                                    let cls = 'word-span';
+                                    if (isLookedUp) cls += ' word-failed';
+                                    else if (info?.isDue) cls += ' word-due';
+                                    else if (info?.isTarget) cls += ' word-target';
+                                    else if (info?.step >= 6) cls += ' word-known';
+                                    else if (info) cls += ' word-learning';
+                                    
+                                    return <span key={i} className={cls} onClick={(e) => wordClick(e, clean)}>{part}</span>;
+                                })
+                            )
+                        ) : (
                             <div style={{textAlign:'center', padding:'4rem 0', color:'#9ca3af'}}>
                                 <i className="ri-edit-box-line" style={{fontSize:'3rem', display:'block', marginBottom:'1rem'}}></i>
                                 <p>Click <strong>Generate</strong> to create a passage.</p>
